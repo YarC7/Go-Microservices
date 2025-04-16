@@ -1,0 +1,163 @@
+{
+  "info": {
+    "_postman_id": "9f8e7d6c-5b4a-3c2b-1a9d-8e7f6d5c4b3a",
+    "name": "Product Service API",
+    "description": "Collection for testing Product Service endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Product",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sample Product\",\n  \"description\": \"A detailed description of the product\",\n  \"price\": 29.99,\n  \"category\": \"Electronics\",\n  \"stock\": 100,\n  \"image_url\": \"https://example.com/product-image.jpg\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/products",
+          "host": ["{{base_url}}"],
+          "path": ["products"]
+        },
+        "description": "Create a new product"
+      }
+    },
+    {
+      "name": "Get Product",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products/1",
+          "host": ["{{base_url}}"],
+          "path": ["products", "1"]
+        },
+        "description": "Retrieve product details by ID"
+      }
+    },
+    {
+      "name": "List Products",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products?page=1&limit=10&category=Electronics",
+          "host": ["{{base_url}}"],
+          "path": ["products"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            },
+            {
+              "key": "category",
+              "value": "Electronics"
+            }
+          ]
+        },
+        "description": "List products with pagination and optional filtering"
+      }
+    },
+    {
+      "name": "Update Product",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Updated Product Name\",\n  \"description\": \"Updated product description\",\n  \"price\": 39.99,\n  \"category\": \"Electronics\",\n  \"stock\": 150,\n  \"image_url\": \"https://example.com/updated-image.jpg\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/products/1",
+          "host": ["{{base_url}}"],
+          "path": ["products", "1"]
+        },
+        "description": "Update an existing product"
+      }
+    },
+    {
+      "name": "Delete Product",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products/1",
+          "host": ["{{base_url}}"],
+          "path": ["products", "1"]
+        },
+        "description": "Delete a product by ID"
+      }
+    },
+    {
+      "name": "Update Stock",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"stock\": 200\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/products/1/stock",
+          "host": ["{{base_url}}"],
+          "path": ["products", "1", "stock"]
+        },
+        "description": "Update product stock quantity"
+      }
+    },
+    {
+      "name": "Search Products",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/products/search?query=electronics&min_price=20&max_price=100",
+          "host": ["{{base_url}}"],
+          "path": ["products", "search"],
+          "query": [
+            {
+              "key": "query",
+              "value": "electronics"
+            },
+            {
+              "key": "min_price",
+              "value": "20"
+            },
+            {
+              "key": "max_price",
+              "value": "100"
+            }
+          ]
+        },
+        "description": "Search products by keyword with price range filter"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ]
+} 

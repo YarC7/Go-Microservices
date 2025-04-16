@@ -1,0 +1,197 @@
+ name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:6
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+          - 5672:5672
+          - 15672:15672
+        options: >-
+          --health-cmd "rabbitmqctl node_health_check"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Install dependencies
+      run: |
+        go mod download
+        go install gotest.tools/gotestsum@latest
+
+    - name: Run Tests
+      run: |
+        gotestsum --format pkgname --junitfile junit.xml -- -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: test_db
+        REDIS_HOST: localhost
+        RABBITMQ_HOST: localhost
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: junit.xml
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.txt
+
+  scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        severity: 'CRITICAL,HIGH'
+
+    - name: Run gosec
+      uses: securego/gosec@master
+      with:
+        args: ./...
+
+  build:
+    name: Build and Push
+    runs-on: ubuntu-latest
+    needs: scan
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push API Gateway
+      uses: docker/build-push-action@v4
+      with:
+        context: ./api-gateway
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api-gateway:${{ github.sha }}
+
+    - name: Build and push Product Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./product-service
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/product-service:${{ github.sha }}
+
+    - name: Build and push Order Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./order-service
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/order-service:${{ github.sha }}
+
+    - name: Build and push Inventory Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./inventory-service
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/inventory-service:${{ github.sha }}
+
+    - name: Build and push Notification Service
+      uses: docker/build-push-action@v4
+      with:
+        context: ./notification-service
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/notification-service:${{ github.sha }}
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.25.0'
+
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig.yaml
+        export KUBECONFIG=kubeconfig.yaml
+
+    - name: Update deployment images
+      run: |
+        kubectl set image deployment/api-gateway api-gateway=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api-gateway:${{ github.sha }}
+        kubectl set image deployment/product-service product-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/product-service:${{ github.sha }}
+        kubectl set image deployment/order-service order-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/order-service:${{ github.sha }}
+        kubectl set image deployment/inventory-service inventory-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/inventory-service:${{ github.sha }}
+        kubectl set image deployment/notification-service notification-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/notification-service:${{ github.sha }}
+
+    - name: Verify deployment
+      run: |
+        kubectl rollout status deployment/api-gateway
+        kubectl rollout status deployment/product-service
+        kubectl rollout status deployment/order-service
+        kubectl rollout status deployment/inventory-service
+        kubectl rollout status deployment/notification-service
