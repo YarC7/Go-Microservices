@@ -10,13 +10,23 @@ import (
 
 	"go-microservices/order-service/controller"
 	"go-microservices/order-service/model"
+	"go-microservices/order-service/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-// Mock InventoryService
+// Define interfaces that match the service methods
+type InventoryServiceInterface interface {
+	CheckAvailability(productID int, quantity int) (bool, error)
+}
+
+type NotificationServiceInterface interface {
+	SendOrderNotification(orderID int) error
+}
+
+// Mock InventoryService interface
 type MockInventoryService struct {
 	mock.Mock
 }
@@ -26,13 +36,18 @@ func (m *MockInventoryService) CheckAvailability(productID int, quantity int) (b
 	return args.Bool(0), args.Error(1)
 }
 
-// Mock NotificationService
+// Mock NotificationService interface
 type MockNotificationService struct {
 	mock.Mock
 }
 
 func (m *MockNotificationService) SendOrderNotification(orderID int) error {
 	args := m.Called(orderID)
+	return args.Error(0)
+}
+
+func (m *MockNotificationService) SendOrderStatusUpdate(orderID int, customerID int, status string) error {
+	args := m.Called(orderID, customerID, status)
 	return args.Error(0)
 }
 

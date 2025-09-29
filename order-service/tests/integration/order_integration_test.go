@@ -139,7 +139,7 @@ func TestCacheIntegration(t *testing.T) {
 }
 
 func TestMessageQueueIntegration(t *testing.T) {
-	router, _, cleanup := setupTestEnvironment(t)
+	router, redisClient, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
 	// Setup test queue

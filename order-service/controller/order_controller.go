@@ -19,12 +19,28 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// InventoryServiceInterface defines the interface for inventory service
+type InventoryServiceInterface interface {
+	CheckAvailability(productID int, quantity int) (bool, error)
+}
+
+// NotificationServiceInterface defines the interface for notification service
+type NotificationServiceInterface interface {
+	SendOrderNotification(orderID int) error
+	SendOrderStatusUpdate(orderID int, customerID int, status string) error
+}
+
+// PaymentServiceInterface defines the interface for payment service
+type PaymentServiceInterface interface {
+	CreatePayment(orderID int, customerID int, amount float64, currency string) (map[string]interface{}, error)
+}
+
 // OrderController handles order-related requests
 type OrderController struct {
 	DB                  *sql.DB
-	InventoryService    *service.InventoryService
-	NotificationService *service.NotificationService
-	PaymentService      *service.PaymentService
+	InventoryService    InventoryServiceInterface
+	NotificationService NotificationServiceInterface
+	PaymentService      PaymentServiceInterface
 }
 
 // NewOrderController creates a new order controller
