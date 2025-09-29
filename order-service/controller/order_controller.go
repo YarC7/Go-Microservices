@@ -24,6 +24,7 @@ type OrderController struct {
 	DB                  *sql.DB
 	InventoryService    *service.InventoryService
 	NotificationService *service.NotificationService
+	PaymentService      *service.PaymentService
 }
 
 // NewOrderController creates a new order controller
@@ -32,6 +33,7 @@ func NewOrderController(db *sql.DB) *OrderController {
 		DB:                  db,
 		InventoryService:    service.NewInventoryService(),
 		NotificationService: service.NewNotificationService(),
+		PaymentService:      service.NewPaymentService(),
 	}
 }
 
@@ -79,6 +81,76 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 	}()
 
 	c.JSON(http.StatusCreated, order)
+}
+
+// CreateOrderWithPayment handles creation of a new order with payment intent
+func (oc *OrderController) CreateOrderWithPayment(c *gin.Context) {
+	var orderWithPayment struct {
+		model.Order
+		Currency string `json:"currency" binding:"required"`
+	}
+	
+	if err := c.ShouldBindJSON(&orderWithPayment); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Check inventory availability using circuit breaker
+	available, err := oc.InventoryService.CheckAvailability(orderWithPayment.ProductID, orderWithPayment.Quantity)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Failed to check inventory: " + err.Error()})
+		return
+	}
+	if !available {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Product not available in requested quantity"})
+		return
+	}
+
+	// Insert order into database
+	err = oc.insertOrder(&orderWithPayment.Order)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order: " + err.Error()})
+		return
+	}
+
+	// Create payment intent
+	paymentResp, err := oc.PaymentService.CreatePayment(
+		orderWithPayment.ID,
+		orderWithPayment.CustomerID,
+		orderWithPayment.TotalPrice,
+		orderWithPayment.Currency,
+	)
+	if err != nil {
+		log.Printf("Warning: Failed to create payment intent: %v\n", err)
+		// Still return the order but indicate payment failed
+		c.JSON(http.StatusCreated, gin.H{
+			"order": orderWithPayment.Order,
+			"payment_error": "Failed to create payment intent: " + err.Error(),
+		})
+		return
+	}
+
+	// Publish order created event to RabbitMQ
+	orderMsg, _ := json.Marshal(orderWithPayment.Order)
+	if err := queue.PublishMessage(queue.Config{
+		QueueName:    "orders",
+		RoutingKey:   "order.created",
+		ExchangeName: "orders",
+	}, orderMsg); err != nil {
+		log.Printf("Warning: Failed to publish order created event: %v\n", err)
+	}
+
+	// Send notification using circuit breaker
+	go func() {
+		if err := oc.NotificationService.SendOrderNotification(orderWithPayment.ID); err != nil {
+			log.Printf("Failed to send notification: %v\n", err)
+		}
+	}()
+
+	c.JSON(http.StatusCreated, gin.H{
+		"order": orderWithPayment.Order,
+		"payment": paymentResp,
+	})
 }
 
 // GetOrders returns all orders

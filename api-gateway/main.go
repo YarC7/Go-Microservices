@@ -22,6 +22,7 @@ var (
 	orderServiceURL        = getEnv("ORDER_SERVICE_URL", "http://order-service:8081")
 	inventoryServiceURL    = getEnv("INVENTORY_SERVICE_URL", "http://inventory-service:8082")
 	notificationServiceURL = getEnv("NOTIFICATION_SERVICE_URL", "http://notification-service:8083")
+	paymentServiceURL      = getEnv("PAYMENT_SERVICE_URL", "http://payment-service:8084")
 )
 
 // List of our services
@@ -30,10 +31,17 @@ var services = []Service{
 	{URL: orderServiceURL, Name: "order"},
 	{URL: inventoryServiceURL, Name: "inventory"},
 	{URL: notificationServiceURL, Name: "notification"},
+	{URL: paymentServiceURL, Name: "payment"},
 }
 
 func main() {
 	r := gin.Default()
+
+	// Serve static files from the client/dist directory (Vite build output)
+	clientDistPath := getEnv("CLIENT_DIST_PATH", "./client/dist")
+	r.Static("/assets", clientDistPath+"/assets")
+	r.StaticFile("/", clientDistPath+"/index.html")
+	r.StaticFile("/favicon.ico", clientDistPath+"/favicon.ico")
 
 	// CORS middleware
 	r.Use(func(c *gin.Context) {
@@ -74,6 +82,9 @@ func main() {
 	// Notifications
 	apiV1.Any("/notifications/*path", createReverseProxy(notificationServiceURL, "/notifications"))
 
+	// Payments
+	apiV1.Any("/payments/*path", createReverseProxy(paymentServiceURL, "/payments"))
+
 	// Documentation endpoint
 	r.GET("/", func(c *gin.Context) {
 		// List available endpoints
@@ -108,6 +119,12 @@ func main() {
 				"POST /api/v1/notifications - Create notification",
 				"PUT /api/v1/notifications/:id/deliver - Mark notification as delivered",
 				"POST /api/v1/notifications/order-status - Process order status update",
+			},
+			"payments": {
+				"POST /api/v1/payments - Create payment intent with Stripe",
+				"POST /api/v1/payments/confirm - Confirm payment",
+				"GET /api/v1/payments/:id - Get payment details",
+				"GET /api/v1/payments/order/:orderId - Get payments by order ID",
 			},
 		}
 

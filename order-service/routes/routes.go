@@ -10,6 +10,7 @@ import (
 func SetupRoutes(router *gin.Engine, orderController *controller.OrderController) {
 	// Order routes
 	router.POST("/orders", orderController.CreateOrder)
+	router.POST("/orders/with-payment", orderController.CreateOrderWithPayment)
 	router.POST("/orders/batch", orderController.CreateBatchOrders)
 	router.GET("/orders", orderController.GetOrders)
 	router.GET("/orders/:id", orderController.GetOrder)

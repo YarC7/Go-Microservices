@@ -9,6 +9,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/sony/gobreaker v0.5.0
+	github.com/stripe/stripe-go/v76 v76.14.0
 )
 
 require (

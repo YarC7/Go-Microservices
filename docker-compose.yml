@@ -13,11 +13,13 @@ services:
       - ORDER_SERVICE_URL=http://order-service:8081
       - INVENTORY_SERVICE_URL=http://inventory-service:8082
       - NOTIFICATION_SERVICE_URL=http://notification-service:8083
+      - PAYMENT_SERVICE_URL=http://payment-service:8084
     depends_on:
       - product-service
       - order-service
       - inventory-service
       - notification-service
+      - payment-service
     restart: on-failure
     networks:
       - microservices-network
@@ -126,6 +128,26 @@ services:
     networks:
       - microservices-network
 
+  # Payment Service
+  payment-service:
+    build:
+      context: .
+      dockerfile: ./payment-service/Dockerfile
+    ports:
+      - "8084:8084"
+    environment:
+      - DB_HOST=payment-db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=canh177
+      - DB_NAME=payment_db
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    depends_on:
+      - payment-db
+    restart: on-failure
+    networks:
+      - microservices-network
+
   # Prometheus
   prometheus:
     image: prom/prometheus:latest
@@ -213,11 +235,26 @@ services:
     networks:
       - microservices-network
 
+  # Payment Database
+  payment-db:
+    image: postgres:14-alpine
+    ports:
+      - "5436:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=canh177
+      - POSTGRES_DB=payment_db
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+
 volumes:
   product-db-data:
   order-db-data:
   inventory-db-data:
   notification-db-data:
+  payment-db-data:
   prometheus_data:
   grafana_data:
   redis_data:
