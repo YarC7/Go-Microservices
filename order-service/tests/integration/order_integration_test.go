@@ -42,8 +42,10 @@ func setupTestEnvironment(t *testing.T) (*gin.Engine, *redis.Client, func()) {
 
 	// Return cleanup function
 	cleanup := func() {
-		redisClient.FlushDB(context.Background())
-		redisClient.Close()
+		if redisClient != nil {
+			redisClient.FlushDB(context.Background())
+			redisClient.Close()
+		}
 		queue.Close()
 	}
 
@@ -139,7 +141,7 @@ func TestCacheIntegration(t *testing.T) {
 }
 
 func TestMessageQueueIntegration(t *testing.T) {
-	router, redisClient, cleanup := setupTestEnvironment(t)
+	router, _, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
 	// Setup test queue
