@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
-	"time"
 
 	"go-microservices/order-service/cache"
 	"go-microservices/order-service/controller"
@@ -25,7 +24,7 @@ import (
 // setupIntegrationTestEnvironment creates a test environment with real dependencies
 func setupIntegrationTestEnvironment(t *testing.T) (*gin.Engine, *sql.DB, *redis.Client, func()) {
 	// Setup database
-	database := db.InitDB()
+	database := db.GetDB()
 	if database == nil {
 		t.Fatal("Failed to initialize database")
 	}
@@ -68,8 +67,10 @@ func setupIntegrationTestEnvironment(t *testing.T) (*gin.Engine, *sql.DB, *redis
 		database.Exec("DELETE FROM orders WHERE customer_id = 999") // Clean up test orders
 		
 		// Clean up Redis
-		redisClient.FlushDB(context.Background())
-		redisClient.Close()
+		if redisClient != nil {
+			redisClient.FlushDB(context.Background())
+			redisClient.Close()
+		}
 		
 		// Close database
 		database.Close()

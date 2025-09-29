@@ -53,7 +53,7 @@ func setupTestEnvironment(t *testing.T) (*gin.Engine, *redis.Client, func()) {
 }
 
 func TestOrderFlowIntegration(t *testing.T) {
-	router, redisClient, cleanup := setupTestEnvironment(t)
+	router, _, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
 	// Test creating an order
