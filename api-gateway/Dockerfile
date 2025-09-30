@@ -2,24 +2,18 @@ FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
-# Copy go.mod từ root
-COPY go.mod ./
-
-# Download dependencies
-RUN go mod download
-
-# Copy toàn bộ source từ root
+# Copy the entire project to the container
 COPY . .
 
-# Build service api-gateway
+# Build the API gateway service
 RUN CGO_ENABLED=0 GOOS=linux go build -o /api-gateway ./api-gateway
 
 # Final stage
 FROM alpine:latest
 
-WORKDIR /app
+WORKDIR /root/
 
-# Copy binary từ builder
+# Copy the binary from builder
 COPY --from=builder /api-gateway .
 
 EXPOSE 8000
