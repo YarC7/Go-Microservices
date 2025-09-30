@@ -91,3 +91,19 @@ func GetOrSet(key string, value interface{}, expiration time.Duration, fn func()
 
 	return json.Unmarshal(data, value)
 }
+
+
+func Close() error {
+	if redisClient != nil {
+		return redisClient.Close()
+	}
+	return nil
+}
+
+// Flush clears all keys in the current DB (useful for testing)
+func Flush() error {
+	if redisClient != nil {
+		return redisClient.FlushDB(ctx).Err()
+	}
+	return nil
+}
