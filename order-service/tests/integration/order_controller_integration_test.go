@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"testing"
 
 	"go-microservices/order-service/cache"
@@ -46,6 +47,9 @@ func setupIntegrationTestEnvironment(t *testing.T) (*gin.Engine, *sql.DB, *redis
 		t.Fatalf("Failed to connect to Redis: %v", err)
 	}
 
+	// Init cache package với client test
+	cache.Init(redisClient)
+
 	// Setup RabbitMQ
 	err = queue.InitRabbitMQ()
 	if err != nil {
@@ -65,16 +69,16 @@ func setupIntegrationTestEnvironment(t *testing.T) (*gin.Engine, *sql.DB, *redis
 	cleanup := func() {
 		// Clean up test data
 		database.Exec("DELETE FROM orders WHERE customer_id = 999") // Clean up test orders
-		
+
 		// Clean up Redis
 		if redisClient != nil {
 			redisClient.FlushDB(context.Background())
 			redisClient.Close()
 		}
-		
+
 		// Close database
 		database.Close()
-		
+
 		// Close RabbitMQ
 		queue.Close()
 	}
@@ -83,12 +87,10 @@ func setupIntegrationTestEnvironment(t *testing.T) (*gin.Engine, *sql.DB, *redis
 }
 
 func TestCreateOrderIntegration_Success(t *testing.T) {
-	// Skip integration test if running in CI or when integration services are not available
 	if os.Getenv("SKIP_INTEGRATION_TESTS") == "true" {
 		t.Skip("Skipping integration test")
 	}
 
-	// Setup
 	router, _, _, cleanup := setupIntegrationTestEnvironment(t)
 	defer cleanup()
 
@@ -103,15 +105,13 @@ func TestCreateOrderIntegration_Success(t *testing.T) {
 	orderJSON, _ := json.Marshal(order)
 	req := httptest.NewRequest("POST", "/orders", bytes.NewBuffer(orderJSON))
 	req.Header.Set("Content-Type", "application/json")
-
-	// Create response recorder
 	w := httptest.NewRecorder()
 
 	// Perform request
 	router.ServeHTTP(w, req)
 
 	// Assert response
-	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.Equal(t, http.StatusCreated, w.Code, "Response body: %s", w.Body.String())
 
 	// Parse response
 	var createdOrder model.Order
@@ -121,20 +121,18 @@ func TestCreateOrderIntegration_Success(t *testing.T) {
 	assert.Equal(t, "pending", createdOrder.Status)
 
 	// Test that order is cached
-	cacheKey := "order:" + string(rune(createdOrder.ID))
+	cacheKey := "order:" + strconv.Itoa(int(createdOrder.ID))
 	var cachedOrder model.Order
 	err = cache.Get(cacheKey, &cachedOrder)
-	// Note: Cache might not be immediately available, so this test might be flaky
-	// In a real scenario, you might want to add a small delay or retry mechanism
+	assert.NoError(t, err, "Cache lookup failed")
+	assert.Equal(t, createdOrder.ID, cachedOrder.ID)
 }
 
 func TestGetOrderIntegration_Success(t *testing.T) {
-	// Skip integration test if running in CI or when integration services are not available
 	if os.Getenv("SKIP_INTEGRATION_TESTS") == "true" {
 		t.Skip("Skipping integration test")
 	}
 
-	// Setup
 	router, _, _, cleanup := setupIntegrationTestEnvironment(t)
 	defer cleanup()
 
@@ -144,25 +142,24 @@ func TestGetOrderIntegration_Success(t *testing.T) {
 		CustomerID: 999,
 		Quantity:   1,
 	}
-
 	orderJSON, _ := json.Marshal(order)
 	req := httptest.NewRequest("POST", "/orders", bytes.NewBuffer(orderJSON))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.Equal(t, http.StatusCreated, w.Code, "Response body: %s", w.Body.String())
 
 	var createdOrder model.Order
 	err := json.Unmarshal(w.Body.Bytes(), &createdOrder)
 	assert.NoError(t, err)
 
 	// Now get the order
-	req = httptest.NewRequest("GET", "/orders/"+string(rune(createdOrder.ID)), nil)
+	req = httptest.NewRequest("GET", "/orders/"+strconv.Itoa(int(createdOrder.ID)), nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code, "Response body: %s", w.Body.String())
 
 	var retrievedOrder model.Order
 	err = json.Unmarshal(w.Body.Bytes(), &retrievedOrder)
