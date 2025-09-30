@@ -20,8 +20,10 @@ type PaymentController struct {
 
 func NewPaymentController(db *sql.DB) *PaymentController {
 	// Initialize Stripe
-	stripe.Key = getEnv("STRIPE_SECRET_KEY", "sk_test_51234567890") // Use your Stripe test key
-	
+	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
+	if stripe.Key == "" {
+		log.Fatal("STRIPE_SECRET_KEY is required but not set")
+	}	
 	return &PaymentController{
 		db: db,
 	}
