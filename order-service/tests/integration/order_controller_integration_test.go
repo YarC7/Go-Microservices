@@ -89,7 +89,7 @@ func TestCreateOrderIntegration_Success(t *testing.T) {
 	}
 
 	// Setup
-	router, _, redisClient, cleanup := setupIntegrationTestEnvironment(t)
+	router, _, _, cleanup := setupIntegrationTestEnvironment(t)
 	defer cleanup()
 
 	// Prepare test data
