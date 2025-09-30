@@ -2,8 +2,8 @@ FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
-# Copy go.mod & go.sum từ root
-COPY go.mod go.sum ./
+# Copy go.mod từ root
+COPY go.mod ./
 
 # Download dependencies
 RUN go mod download
