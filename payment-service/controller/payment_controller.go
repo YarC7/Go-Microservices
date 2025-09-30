@@ -2,6 +2,7 @@ package controller
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
 	"os"
 	"strconv"

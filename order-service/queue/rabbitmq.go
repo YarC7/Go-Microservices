@@ -133,9 +133,13 @@ func ConsumeMessages(config Config, handler func([]byte) error) error {
 		for msg := range msgs {
 			if err := handler(msg.Body); err != nil {
 				fmt.Printf("Error processing message: %v\n", err)
-				msg.Nack(false, true) // Negative acknowledgement, requeue
+				if err := msg.Nack(false, true); err != nil { // Negative acknowledgement, requeue
+					fmt.Printf("Error sending nack: %v\n", err)
+				}
 			} else {
-				msg.Ack(false) // Positive acknowledgement
+				if err := msg.Ack(false); err != nil { // Positive acknowledgement
+					fmt.Printf("Error sending ack: %v\n", err)
+				}
 			}
 		}
 	}()
@@ -146,9 +150,13 @@ func ConsumeMessages(config Config, handler func([]byte) error) error {
 // Close closes RabbitMQ connection
 func Close() {
 	if channel != nil {
-		channel.Close()
+		if err := channel.Close(); err != nil {
+			fmt.Printf("Error closing channel: %v\n", err)
+		}
 	}
 	if conn != nil {
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			fmt.Printf("Error closing connection: %v\n", err)
+		}
 	}
 }
